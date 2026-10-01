@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useData } from '../context/DataContext';
-import { NeoButton, NeoCard, NeoInput, NeoSelect, NeoTable, NeoModal, NeoBottomNav, NeoConfirmModal, IconLoading, SyncIndicator } from '../components/NeoUI';
+import { NeoButton, NeoCard, NeoInput, NeoSelect, NeoTable, NeoModal, NeoBottomNav, NeoConfirmModal, IconLoading } from '../components/NeoUI';
 import { User, Class, Student, SystemSettings, Journal } from '../types';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
@@ -45,7 +45,7 @@ const standardizeDate = (input: string) => {
 const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
   const { 
     users, classes, students, journals, attendance, settings, 
-    loading, syncing, addUser, deleteUser, addClass, deleteClass, 
+    loading, addUser, deleteUser, addClass, deleteClass, 
     addStudent, deleteStudent, saveSettings, syncData
   } = useData();
   
@@ -854,7 +854,6 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
   return (
     <div className="min-h-screen pb-24 md:pb-10 relative bg-gray-100">
-        <SyncIndicator syncing={syncing} />
         <div className="bg-neo-purple border-b-4 border-black sticky top-0 z-10 px-4 md:px-6 py-4 flex justify-between items-center shadow-neo-lg text-white">
             <div className="flex flex-col">
                 <h1 className="text-xl md:text-3xl font-black uppercase tracking-tighter italic">ADMIN PANEL</h1>

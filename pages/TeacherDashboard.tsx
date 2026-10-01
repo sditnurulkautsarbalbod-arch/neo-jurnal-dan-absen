@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useData } from '../context/DataContext';
-import { NeoButton, NeoCard, NeoInput, NeoSelect, NeoTable, NeoToast, NeoBottomNav, NeoModal, NeoConfirmModal, IconLoading, IconSync, SyncIndicator } from '../components/NeoUI';
+import { NeoButton, NeoCard, NeoInput, NeoSelect, NeoTable, NeoToast, NeoBottomNav, NeoModal, NeoConfirmModal, IconLoading, IconSync } from '../components/NeoUI';
 import { User, Journal, AttendanceRecord } from '../types';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
@@ -58,7 +58,7 @@ const toInputDate = (dateString: string) => {
 };
 
 const TeacherDashboard: React.FC<TeacherProps> = ({ user, onLogout }) => {
-  const { classes, students, journals, attendance, addJournal, deleteJournal, addAttendance, deleteAttendance, syncData, loading, syncing } = useData();
+  const { classes, students, journals, attendance, addJournal, deleteJournal, addAttendance, deleteAttendance, syncData, loading } = useData();
   const [activeTab, setActiveTab] = useState<'input-jurnal' | 'input-absen' | 'rekap-absen' | 'riwayat'>('input-jurnal');
   
   // -- View Modal State --
@@ -749,7 +749,6 @@ const TeacherDashboard: React.FC<TeacherProps> = ({ user, onLogout }) => {
   return (
     <div className="min-h-screen pb-24 md:pb-10 relative bg-gray-100">
       <NeoToast show={toast.show} message={toast.message} onClose={() => setToast({ show: false, message: '' })} />
-      <SyncIndicator syncing={syncing} />
       <div className="bg-neo-green border-b-4 border-black sticky top-0 z-10 px-4 md:px-6 py-4 flex justify-between items-center shadow-neo-lg"><div className="flex flex-col"><h1 className="text-xl md:text-3xl font-black uppercase tracking-tighter italic">DASHBOARD GURU</h1><span className="text-xs font-bold tracking-widest">{user.fullName}</span></div><div className="flex gap-2"><NeoButton onClick={handleManualSync} disabled={isSyncing} variant="secondary" className="text-xs md:text-sm px-2 md:px-4 font-black">{isSyncing ? "SYNCING..." : "SYNC"}</NeoButton><NeoButton onClick={onLogout} variant="danger" className="text-xs md:text-sm px-2 md:px-4">Keluar</NeoButton></div></div>
       <div className="container mx-auto mt-6 md:mt-10 px-2 md:px-6 max-w-5xl"><div className="hidden md:flex gap-4 mb-8">{[{id: 'input-jurnal', label: 'Input Jurnal'}, {id: 'input-absen', label: 'Input Absen'}, {id: 'rekap-absen', label: 'Rekap Absen'}, {id: 'riwayat', label: 'Riwayat Jurnal'}].map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-6 py-3 font-black uppercase border-4 border-black transition-all tracking-wider ${activeTab === tab.id ? 'bg-neo-blue shadow-neo translate-x-[-4px] translate-y-[-4px] text-black rotate-1' : 'bg-white hover:bg-gray-100 hover:-rotate-1'}`}>{tab.label}</button>))}</div>{activeTab === 'input-jurnal' && renderInputJurnal()}{activeTab === 'input-absen' && renderInputAbsen()}{activeTab === 'rekap-absen' && renderRekapAbsen()}{activeTab === 'riwayat' && renderRekapJurnalGuru()}</div>
       <NeoBottomNav activeId={activeTab} onChange={setActiveTab} items={[{ id: 'input-jurnal', label: 'Jurnal', icon: <IconJurnal /> }, { id: 'input-absen', label: 'Absen', icon: <IconAbsen /> }, { id: 'rekap-absen', label: 'Rekap', icon: <IconRekap /> }, { id: 'riwayat', label: 'Riwayat', icon: <IconRiwayat /> }]} />

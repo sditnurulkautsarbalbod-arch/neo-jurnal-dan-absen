@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NeoButton, NeoCard, NeoInput, IconLoading, SyncIndicator } from '../components/NeoUI';
+import { NeoButton, NeoCard, NeoInput, IconLoading } from '../components/NeoUI';
 import { useData } from '../context/DataContext';
 import { usePwaInstall } from '../hooks/usePwaInstall';
 
@@ -13,7 +13,7 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
-  const { loading, syncing } = useData();
+  const { loading } = useData();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -22,16 +22,17 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [showIOSGuide, setShowIOSGuide] = useState(false);
   const { isStandalone, canPrompt, isIOS, install } = usePwaInstall();
 
-  // Sembunyikan jika sudah terpasang / browser tak mendukung install prompt
-  const showInstallButton = !isStandalone && (canPrompt || isIOS);
+  // Tampil selama belum terpasang — jangan tunggu beforeinstallprompt
+  // (Chrome mobile kadang telat/melewatkan event → tombol tetap tampil dgn panduan manual).
+  const showInstallButton = !isStandalone;
 
   const handleInstallClick = async () => {
-    // iOS tak punya beforeinstallprompt -> tampilkan panduan manual
-    if (isIOS && !canPrompt) {
-      setShowIOSGuide((prev) => !prev);
+    if (canPrompt) {
+      await install();
       return;
     }
-    await install();
+    // Tanpa prompt (iOS / Chrome telat event / WebView) → panduan manual
+    setShowIOSGuide((prev) => !prev);
   };
 
   // Autentikasi server-side: hash bcrypt tidak lagi dikirim/diproses di browser.
@@ -60,7 +61,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-neo-blue">
-      <SyncIndicator syncing={syncing} />
       {/* Decorative Elements */}
       <div className="absolute top-10 left-10 w-32 h-32 bg-neo-yellow border-4 border-black shadow-neo-xl transform -rotate-12 hidden md:block"></div>
       <div className="absolute bottom-10 right-10 w-40 h-40 bg-neo-pink border-4 border-black shadow-neo-xl rounded-full transform rotate-12 hidden md:block"></div>
@@ -70,11 +70,21 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         <div className="fixed top-4 right-4 z-50 flex flex-col items-end gap-2">
           {showIOSGuide && (
             <div className="bg-white border-3 border-black shadow-neo p-3 text-xs font-bold max-w-[250px]">
-              <p className="mb-1 uppercase font-black">iPhone / iPad:</p>
+              <p className="mb-1 uppercase font-black">{isIOS ? 'iPhone / iPad:' : 'Chrome:'}</p>
               <ol className="list-decimal ml-5 space-y-1">
-                <li>Ketuk tombol <strong>Bagikan</strong> (ikon kotak panah ↑)</li>
-                <li>Pilih <strong>Tambahkan ke Layar Utama</strong></li>
-                <li>Konfirmasi dengan <strong>Tambah</strong></li>
+                {isIOS ? (
+                  <>
+                    <li>Ketuk tombol <strong>Bagikan</strong> (ikon kotak panah ↑)</li>
+                    <li>Pilih <strong>Tambahkan ke Layar Utama</strong></li>
+                    <li>Konfirmasi dengan <strong>Tambah</strong></li>
+                  </>
+                ) : (
+                  <>
+                    <li>Ketuk menu <strong>⋮</strong> (tiga titik) di pojok kanan atas</li>
+                    <li>Pilih <strong>Tambahkan ke layar utama</strong> / <strong>Install app</strong></li>
+                    <li>Konfirmasi dengan <strong>Install</strong> / <strong>Tambah</strong></li>
+                  </>
+                )}
               </ol>
               <button
                 type="button"
