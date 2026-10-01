@@ -1,0 +1,148 @@
+function doGet(e) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const data = {};
+  
+  // List Sheet yang akan dibaca
+  const sheetNames = ['Users', 'Classes', 'Students', 'Journals', 'Attendance', 'Settings'];
+
+  sheetNames.forEach(sheetName => {
+    const sheet = ss.getSheetByName(sheetName);
+    // Jika sheet tidak ada, kembalikan array kosong untuk mencegah error
+    if (!sheet) {
+      data[sheetName.toLowerCase()] = [];
+      return;
+    }
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      // Hanya header atau kosong
+      data[sheetName.toLowerCase()] = [];
+      return;
+    }
+
+    const rows = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
+    const headers = rows[0];
+    
+    data[sheetName.toLowerCase()] = rows.slice(1).map(row => {
+      let obj = {};
+      headers.forEach((h, i) => {
+        // Handle konversi tanggal agar konsisten string ISO
+        if (row[i] instanceof Date) {
+             obj[h] = Utilities.formatDate(row[i], Session.getScriptTimeZone(), "yyyy-MM-dd");
+        } else {
+             obj[h] = row[i];
+        }
+      });
+      return obj;
+    });
+  });
+
+  return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let body;
+  
+  try {
+    body = JSON.parse(e.postData.contents);
+  } catch (err) {
+    return responseJSON({status: 'error', message: 'Invalid JSON body'});
+  }
+
+  const action = body.action; 
+  const collection = body.collection; 
+  const data = body.data;
+
+  // Mapping collection name to Sheet Name
+  const sheetName = collection.charAt(0).toUpperCase() + collection.slice(1);
+  const sheet = ss.getSheetByName(sheetName);
+  
+  if (!sheet) return responseJSON({status: 'error', message: 'Sheet not found: ' + sheetName});
+
+  const lastColumn = sheet.getLastColumn();
+  if (lastColumn === 0) return responseJSON({status: 'error', message: 'Sheet header missing'});
+
+  const headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+
+  const lock = LockService.getScriptLock();
+  // Tunggu maksimal 10 detik untuk mencegah tabrakan data (Concurrency)
+  try {
+    lock.waitLock(10000); 
+  } catch (e) {
+    return responseJSON({status: 'error', message: 'Server busy, try again.'});
+  }
+
+  try {
+    if (action === 'CREATE') {
+      const newRow = headers.map(h => {
+        let val = data[h];
+        if (h === 'students_json' && typeof val === 'object') return JSON.stringify(val);
+        
+        // Tambahkan tanda ' untuk mencegah auto-format di Sheets
+        if (collection === 'journals' && h === 'jam') {
+          return "'" + val;
+        }
+        if (collection === 'students' && (h === 'id' || h === 'nisn')) {
+          return "'" + val;
+        }
+
+        // Pastikan undefined/null jadi string kosong agar tidak error
+        return (val === undefined || val === null) ? '' : val;
+      });
+      sheet.appendRow(newRow);
+    } 
+    else if (action === 'UPDATE' || action === 'DELETE') {
+      const lastRow = sheet.getLastRow();
+      
+      if (lastRow <= 1) {
+         return responseJSON({status: 'error', message: 'No data to update/delete'});
+      }
+
+      // Ambil semua ID di kolom A (asumsi ID selalu di kolom pertama/A)
+      // Baris dimulai dari 2 (karena 1 adalah header)
+      const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues().flat().map(v => String(v).replace(/'/g, ""));
+      const targetId = String(data.id).replace(/'/g, "");
+      const rowIndex = ids.indexOf(targetId);
+
+      if (rowIndex !== -1) {
+        // rowIndex adalah index array, posisi baris asli = rowIndex + 2
+        const actualRow = rowIndex + 2;
+
+        if (action === 'UPDATE') {
+          const newRow = headers.map(h => {
+            let val = data[h];
+            if (h === 'students_json' && typeof val === 'object') return JSON.stringify(val);
+            
+            // Tambahkan tanda ' untuk mencegah auto-format di Sheets
+            if (collection === 'journals' && h === 'jam') {
+              return "'" + val;
+            }
+            if (collection === 'students' && (h === 'id' || h === 'nisn')) {
+              return "'" + val;
+            }
+
+            return (val === undefined || val === null) ? '' : val;
+          });
+          sheet.getRange(actualRow, 1, 1, newRow.length).setValues([newRow]);
+        } 
+        else if (action === 'DELETE') {
+          sheet.deleteRow(actualRow);
+        }
+      } else {
+         return responseJSON({status: 'error', message: 'ID not found: ' + data.id});
+      }
+    }
+    
+    return responseJSON({status: 'success'});
+
+  } catch (err) {
+    return responseJSON({status: 'error', message: err.toString()});
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function responseJSON(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
