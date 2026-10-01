@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NeoButton, NeoCard, NeoInput, IconLoading, IconSync } from '../components/NeoUI';
+import { NeoButton, NeoCard, NeoInput, IconLoading, IconSync, SyncIndicator } from '../components/NeoUI';
 import { useData } from '../context/DataContext';
 import { usePwaInstall } from '../hooks/usePwaInstall';
 
@@ -13,7 +13,7 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
-  const { loading, syncData } = useData();
+  const { loading, syncing, syncData } = useData();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -77,6 +77,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-neo-blue">
+      <SyncIndicator syncing={syncing} />
       {/* Decorative Elements */}
       <div className="absolute top-10 left-10 w-32 h-32 bg-neo-yellow border-4 border-black shadow-neo-xl transform -rotate-12 hidden md:block"></div>
       <div className="absolute bottom-10 right-10 w-40 h-40 bg-neo-pink border-4 border-black shadow-neo-xl rounded-full transform rotate-12 hidden md:block"></div>

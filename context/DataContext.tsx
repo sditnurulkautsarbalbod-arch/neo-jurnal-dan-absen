@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { User, Class, Student, Journal, AttendanceRecord, SystemSettings } from '../types';
 import { 
     getAllFromStore, saveToStore, saveItemToStore, deleteItemFromStore, 
@@ -14,6 +14,7 @@ interface DataContextType {
   attendance: AttendanceRecord[];
   settings: SystemSettings;
   loading: boolean;
+  syncing: boolean;
   syncData: () => Promise<void>;
   
   // CRUD Helpers
@@ -40,6 +41,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [settings, setSettings] = useState<SystemSettings>({ semester: 'Ganjil', tahunAjaran: '2024/2025', kepalaSekolah: '' });
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  // Aktivitas sinkronisasi berjalan (bisa bersarang: processQueue dipanggil syncData & CRUD)
+  const syncActivityRef = useRef(0);
+  // Nomor urut mutasi lokal — dipakai deteksi race antara fetch dan penulisan user
+  const mutationVersionRef = useRef(0);
+
+  const beginSyncActivity = () => {
+      syncActivityRef.current += 1;
+      setSyncing(true);
+  };
+  const endSyncActivity = () => {
+      syncActivityRef.current = Math.max(0, syncActivityRef.current - 1);
+      if (syncActivityRef.current === 0) setSyncing(false);
+  };
 
   // --- 1. LOAD FROM INDEXED DB ON STARTUP & AUTO SYNC ---
   useEffect(() => {
@@ -60,15 +75,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await saveToStore('users', dummyUsers);
             await saveToStore('settings', { id: 'main', ...settings });
         }
-        
-        // Auto Sync: Process Queue & Pull from Sheet
-        await syncData();
-
       } catch (err) {
-        console.error("Failed to load/sync data", err);
+        console.error("Failed to load local data", err);
       } finally {
+        // UI tidak menunggu jaringan: cukup sampai IndexedDB (lokal, milidetik) selesai
         setLoading(false);
       }
+
+      // Auto Sync: Process Queue & Pull from Neon — di BACKGROUND, tidak menahan UI
+      void syncData();
     };
 
     initData();
@@ -99,23 +114,28 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (queue.length === 0) return;
 
       console.log(`Processing ${queue.length} background jobs...`);
-      
-      for (const item of queue) {
-          const req = item.val as ApiRequest;
-          const success = await sendToSheet(req);
-          if (success) {
-              await deleteQueueItem(item.key);
-          } else {
-              // Stop processing if network fails, try again later
-              console.warn("Network failed, pausing queue processing.");
-              break;
+      beginSyncActivity();
+      try {
+          for (const item of queue) {
+              const req = item.val as ApiRequest;
+              const success = await sendToSheet(req);
+              if (success) {
+                  await deleteQueueItem(item.key);
+              } else {
+                  // Stop processing if network fails, try again later
+                  console.warn("Network failed, pausing queue processing.");
+                  break;
+              }
           }
+      } finally {
+          endSyncActivity();
       }
   };
 
   // Helper to add to IDB and Queue
   const enqueueAction = async (action: 'CREATE' | 'UPDATE' | 'DELETE', collection: string, data: any) => {
       const req: ApiRequest = { action, collection: collection as any, data };
+      mutationVersionRef.current += 1;
       await saveItemToStore('mutation_queue', req);
       processQueue(); // Trigger immediately (fire and forget)
   };
@@ -123,13 +143,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // --- 3. SYNC WITH GOOGLE SHEETS (PULL) ---
   const syncData = async () => {
     console.log("Starting Auto Sync...");
-    
+    beginSyncActivity();
+
     try {
       // 1. Process local queue first to ensure upstream is fresh
       await processQueue();
 
+      // Capture versi mutasi lokal SEBELUM fetch — deteksi race dengan CRUD di tengah sync
+      const mutationVersionBeforeFetch = mutationVersionRef.current;
+
       // 2. Fetch all data from Sheet
       const data = await fetchAllFromSheet();
+
+      // Race guard: user menulis data selama fetch berlangsung → hasil fetch mungkin
+      // belum memuat mutasi itu. Lewati overwrite store agar data lokal tidak tertimpa;
+      // data tetap aman di queue & Neon, sinkron berikutnya akan merekonalisasi.
+      if (mutationVersionRef.current !== mutationVersionBeforeFetch) {
+          console.warn("Local mutations detected during sync fetch; skipping store overwrite this round.");
+          return;
+      }
       
       // 3. Normalize Data (Handle JSON strings from Sheet) & Deduplicate
 
@@ -175,6 +207,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     } catch (error) {
       console.error("Sync failed (Offline or Error)", error);
+    } finally {
+      endSyncActivity();
     }
   };
 
@@ -295,7 +329,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <DataContext.Provider value={{ 
-        users, classes, students, journals, attendance, settings, loading, syncData,
+        users, classes, students, journals, attendance, settings, loading, syncing, syncData,
         addUser, deleteUser, addClass, deleteClass, addStudent, deleteStudent,
         addJournal, deleteJournal, addAttendance, deleteAttendance, saveSettings
     }}>
