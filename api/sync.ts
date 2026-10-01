@@ -61,7 +61,20 @@ export async function GET(): Promise<Response> {
         studentCount: c.student_count,
       })),
       students,
-      journals,
+      // Frontend mengharap camelCase (dulu dari header Sheet GAS): tanpaKet, teacherName.
+      journals: journals.map((j) => ({
+        id: j.id,
+        date: j.date ?? '',
+        class: j.class,
+        jam: j.jam,
+        materi: j.materi,
+        aktivitas: j.aktivitas,
+        izin: j.izin ?? 0,
+        sakit: j.sakit ?? 0,
+        tanpaKet: j.tanpa_ket ?? 0,
+        teacher: j.teacher,
+        teacherName: j.teacher_name ?? '',
+      })),
       attendance: attendanceSync,
       settings: settings.map((s) => ({
         id: s.id,
