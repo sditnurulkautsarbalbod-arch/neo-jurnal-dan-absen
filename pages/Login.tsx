@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NeoButton, NeoCard, NeoInput, IconLoading, IconSync, SyncIndicator } from '../components/NeoUI';
+import { NeoButton, NeoCard, NeoInput, IconLoading, SyncIndicator } from '../components/NeoUI';
 import { useData } from '../context/DataContext';
 import { usePwaInstall } from '../hooks/usePwaInstall';
 
@@ -13,12 +13,11 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
-  const { loading, syncing, syncData } = useData();
+  const { loading, syncing } = useData();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [isSyncing, setIsSyncing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [showIOSGuide, setShowIOSGuide] = useState(false);
   const { isStandalone, canPrompt, isIOS, install } = usePwaInstall();
@@ -57,22 +56,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const handleForceSync = async () => {
-      setIsSyncing(true);
-      try {
-          // Add artificial delay (1.5s) to ensure animation is seen
-          await Promise.all([
-              syncData(),
-              new Promise(resolve => setTimeout(resolve, 1500))
-          ]);
-          alert("Sinkronisasi selesai! Silakan coba login kembali.");
-      } catch (e) {
-          alert("Gagal sinkronisasi. Cek koneksi internet.");
-      } finally {
-          setIsSyncing(false);
-      }
   };
 
   return (
@@ -155,19 +138,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 {loading ? "MEMUAT DATA..." : submitting ? "MEMPROSES..." : "MASUK SEKARANG"}
             </NeoButton>
             </form>
-
-            <div className="mt-6 pt-6 border-t-4 border-black text-center">
-                <p className="font-bold text-sm mb-2">Belum ada data? atau Data tidak muncul?</p>
-                <button 
-                    type="button" 
-                    onClick={handleForceSync}
-                    disabled={isSyncing || loading}
-                    className="text-xs font-black underline uppercase hover:text-neo-blue flex items-center justify-center w-full gap-2 transition-colors"
-                >
-                    <IconSync className={isSyncing ? "animate-spin" : ""} />
-                    {isSyncing ? "SEDANG SINKRONISASI..." : "FORCE SYNC DATA DARI SERVER"}
-                </button>
-            </div>
           </div>
       </div>
     </div>
