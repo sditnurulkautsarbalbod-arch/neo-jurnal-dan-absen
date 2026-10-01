@@ -1,6 +1,6 @@
 // POST /api/mutation — CREATE/UPDATE = upsert, DELETE idempotent.
 // Nama tabel & kolom hanya dari whitelist statis; nilai selalu parameterized.
-import { sql, jsonResponse } from './_lib/db';
+import { sql, jsonResponse } from './_lib/db.js';
 
 type Collection = 'users' | 'classes' | 'students' | 'journals' | 'attendance' | 'settings';
 type Action = 'CREATE' | 'UPDATE' | 'DELETE';

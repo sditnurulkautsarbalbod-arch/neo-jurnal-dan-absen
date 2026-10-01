@@ -1,6 +1,6 @@
 // POST /api/login — autentikasi SERVER-SIDE. Hash bcrypt tidak pernah meninggalkan server.
 import bcrypt from 'bcryptjs';
-import { queryRows, jsonResponse, type UserRow } from './_lib/db';
+import { queryRows, jsonResponse, type UserRow } from './_lib/db.js';
 
 function checkPassword(plain: string, stored: string | null): boolean {
   if (!stored) return false;

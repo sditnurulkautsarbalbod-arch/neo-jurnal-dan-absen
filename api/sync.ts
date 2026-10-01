@@ -9,7 +9,7 @@ import {
   type JournalRow,
   type AttendanceRow,
   type SettingsRow,
-} from './_lib/db';
+} from './_lib/db.js';
 
 interface AttendanceSyncRow {
   id: string;
