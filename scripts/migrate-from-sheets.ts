@@ -49,18 +49,25 @@ interface SheetData {
   journals?: SheetJournal[]; attendance?: SheetAttendance[]; settings?: SheetSettings[];
 }
 
+let usedSnapshot = false;
+
 async function loadSheet(): Promise<SheetData> {
-  try {
-    const response = await fetch(GAS_URL, { redirect: 'follow' });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return (await response.json()) as SheetData;
-  } catch (error) {
-    console.warn(
-      'Live fetch gagal, pakai snapshot lokal:',
-      error instanceof Error ? error.message : error
-    );
-    return JSON.parse(readFileSync(SNAPSHOT, 'utf-8')) as SheetData;
+  // GAS exec URL kadang 404 sesaat (rate-limit Google) -> coba beberapa kali sebelum fallback.
+  const MAX_ATTEMPTS = 4;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const response = await fetch(GAS_URL, { redirect: 'follow' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return (await response.json()) as SheetData;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : error;
+      console.warn(`Live fetch gagal (percobaan ${attempt}/${MAX_ATTEMPTS}): ${message}`);
+      if (attempt < MAX_ATTEMPTS) await new Promise((r) => setTimeout(r, attempt * 5000));
+    }
   }
+  usedSnapshot = true;
+  console.warn('Semua percobaan live gagal, pakai snapshot lokal.');
+  return JSON.parse(readFileSync(SNAPSHOT, 'utf-8')) as SheetData;
 }
 
 // --- Transform helpers ---
@@ -164,9 +171,14 @@ function prepareClasses(raw: SheetClass[]): SheetClass[] {
 
 interface PrepStudent { id: string; nisn: string | null; name: string; class: string; gender: string }
 
+// Siswa yang sengaja dihapus dari Neon — jangan dikembalikan oleh copy ulang.
+const STUDENT_EXCLUDE_IDS = new Set(['3164600770']);
+
 function prepareStudents(raw: SheetStudent[]): PrepStudent[] {
   return dedupByLastId(
-    raw.map((s) => ({
+    raw
+      .filter((s) => !STUDENT_EXCLUDE_IDS.has(String(s.id)))
+      .map((s) => ({
       id: String(s.id),
       nisn: s.nisn === null || s.nisn === undefined || s.nisn === '' ? null : stripApostrophe(s.nisn),
       name: s.name ?? '',
@@ -353,6 +365,12 @@ console.log(`\nTotal statement query: ${totalStatements}`);
 if (failures.length > 0) {
   console.error('Koleksi gagal:');
   for (const f of failures) console.error(' -', f);
+}
+if (usedSnapshot) {
+  console.error(
+    'VERIFIKASI GAGAL — sumber snapshot lokal (bukan data live terbaru). Jalankan ulang saat GAS bisa diakses.'
+  );
+  process.exit(1);
 }
 if (mismatch) {
   console.error('VERIFIKASI GAGAL');
