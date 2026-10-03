@@ -174,6 +174,23 @@ interface PrepStudent { id: string; nisn: string | null; name: string; class: st
 // Siswa yang sengaja dihapus dari Neon — jangan dikembalikan oleh copy ulang.
 const STUDENT_EXCLUDE_IDS = new Set(['3164600770']);
 
+// Username lama di Sheet yang sudah di-rename di akun login — samakan saat copy
+// agar rekap riwayat guru tidak terpecah (jurnal lama 'syirah' -> akun 'syira').
+const TEACHER_REMAP: Record<string, string> = { syirah: 'syira' };
+const TEACHER_NAME_REMAP: Record<string, string> = {
+  'Mustabsyirah, S.Pd.': 'Mustabsyira, S.Pd.',
+};
+
+function remapTeacher(teacher: string | null): string | null {
+  if (!teacher) return teacher;
+  return TEACHER_REMAP[teacher] ?? teacher;
+}
+
+function remapTeacherName(name: string | null): string | null {
+  if (!name) return name;
+  return TEACHER_NAME_REMAP[name] ?? name;
+}
+
 function prepareStudents(raw: SheetStudent[]): PrepStudent[] {
   return dedupByLastId(
     raw
@@ -206,8 +223,8 @@ function prepareJournals(raw: SheetJournal[]): PrepJournal[] {
       izin: toInt(j.izin),
       sakit: toInt(j.sakit),
       tanpa_ket: toInt(j.tanpaKet),
-      teacher: j.teacher ?? null,
-      teacher_name: j.teacherName ?? null,
+      teacher: remapTeacher(j.teacher ?? null),
+      teacher_name: remapTeacherName(j.teacherName ?? null),
     }))
   );
 }
@@ -230,7 +247,7 @@ function prepareAttendance(raw: SheetAttendance[]): PrepAttendance[] {
       id: String(a.id),
       date: normDate(a.date),
       class: a.class ?? '',
-      teacher: a.teacher ?? null,
+      teacher: remapTeacher(a.teacher ?? null),
       students: studentsJson,
     };
   });
