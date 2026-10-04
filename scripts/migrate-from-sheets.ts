@@ -179,6 +179,7 @@ const STUDENT_EXCLUDE_IDS = new Set(['3164600770']);
 const TEACHER_REMAP: Record<string, string> = { syirah: 'syira' };
 const TEACHER_NAME_REMAP: Record<string, string> = {
   'Mustabsyirah, S.Pd.': 'Mustabsyira, S.Pd.',
+  'Darmawati Saleh, S.Pd.': 'Darmawati Saleh, S.Pd., Gr.',
 };
 
 function remapTeacher(teacher: string | null): string | null {
@@ -348,34 +349,43 @@ await run('settings', () =>
   ], settings)
 );
 
-// --- Verifikasi jumlah row ---
-const expected: Array<{ name: string; count: number }> = [
-  { name: 'users', count: users.length },
-  { name: 'classes', count: classes.length },
-  { name: 'students', count: students.length },
-  { name: 'journals', count: journals.length },
-  { name: 'attendance', count: attendance.length },
-  { name: 'settings', count: settings.length },
+// --- Verifikasi: semua id di Sheet harus ada di Neon ---
+// Neon juga ditulis langsung oleh app baru, jadi Neon boleh LEBIH BANYAK
+// daripada Sheet (divergensi by design). Yang dicek: tidak ada baris Sheet
+// yang tertinggal (missing = sheet id tidak ditemukan di Neon).
+const expected: Array<{ name: string; count: number; ids: string[] }> = [
+  { name: 'users', count: users.length, ids: users.map((r) => r.id) },
+  { name: 'classes', count: classes.length, ids: classes.map((r) => r.id) },
+  { name: 'students', count: students.length, ids: students.map((r) => r.id) },
+  { name: 'journals', count: journals.length, ids: journals.map((r) => r.id) },
+  { name: 'attendance', count: attendance.length, ids: attendance.map((r) => r.id) },
+  { name: 'settings', count: settings.length, ids: settings.map((r) => r.id) },
 ];
 
 let mismatch = failures.length > 0;
-console.log('\ncollection  | sheet | neon | status');
-console.log('------------|-------|------|-------');
+console.log('\ncollection  | sheet | neon | hilang | status');
+console.log('------------|-------|------|--------|-------');
 for (const exp of expected) {
-  let neonCount = -1;
+  let neonIds = new Set<string>();
   try {
     const rows = (await sql.query(
-      `SELECT count(*)::int AS n FROM ${exp.name}`
-    )) as Array<{ n: number }>;
-    neonCount = rows[0]?.n ?? -1;
+      `SELECT id FROM ${exp.name}`
+    )) as Array<{ id: string }>;
+    neonIds = new Set(rows.map((r) => String(r.id)));
   } catch {
-    neonCount = -1;
+    neonIds = new Set();
   }
-  const ok = neonCount === exp.count;
+  const missing = exp.ids.filter((id) => !neonIds.has(String(id)));
+  const ok = missing.length === 0;
   if (!ok) mismatch = true;
   console.log(
-    `${exp.name.padEnd(11)} | ${String(exp.count).padStart(5)} | ${String(neonCount).padStart(4)} | ${ok ? 'OK' : 'GAGAL'}`
+    `${exp.name.padEnd(11)} | ${String(exp.count).padStart(5)} | ${String(neonIds.size).padStart(4)} | ${String(missing.length).padStart(6)} | ${ok ? 'OK' : 'GAGAL'}`
   );
+  if (!ok) {
+    console.error(
+      `   ${exp.name}: id Sheet tidak ada di Neon: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? ` (+${missing.length - 5} lagi)` : ''}`
+    );
+  }
 }
 
 console.log(`\nTotal statement query: ${totalStatements}`);
@@ -393,4 +403,4 @@ if (mismatch) {
   console.error('VERIFIKASI GAGAL');
   process.exit(1);
 }
-console.log('VERIFIKASI OK — semua jumlah row cocok. Sheet tidak disentuh (read-only).');
+console.log('VERIFIKASI OK — semua row Sheet ada di Neon (Neon boleh lebih banyak, app baru menulis mandiri). Sheet tidak disentuh (read-only).');
