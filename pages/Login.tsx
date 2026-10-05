@@ -145,7 +145,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
             <NeoButton type="submit" disabled={loading || submitting} className="w-full text-xl py-4 bg-neo-green hover:bg-green-400 mt-4 flex justify-center gap-2 items-center">
                 {loading || submitting ? <IconLoading /> : null}
-                {loading ? "MEMUAT DATA..." : submitting ? "MEMPROSES..." : "MASUK SEKARANG"}
+                {loading ? "MEMUAT DATA..." : submitting ? "MEMPROSES..." : "MASUK"}
             </NeoButton>
             </form>
           </div>
