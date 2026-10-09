@@ -180,6 +180,12 @@ const TEACHER_REMAP: Record<string, string> = { syirah: 'syira' };
 const TEACHER_NAME_REMAP: Record<string, string> = {
   'Mustabsyirah, S.Pd.': 'Mustabsyira, S.Pd.',
   'Darmawati Saleh, S.Pd.': 'Darmawati Saleh, S.Pd., Gr.',
+  'Sri Nikmayanti, S.Pd.': 'Sri Nikmayanti, S.Pd., Gr.',
+  'Muhammad Asrar Idrus, S.Pd.': 'Muhammad Asrar Idrus, S.Pd., Gr.',
+  'Nurfatia, S.Hum.': 'Nurfatia, S.Hum., Gr.',
+  'Indah Sari, S.Pd., M.Pd.': 'Indah Sari, S.Pd., M.Pd., Gr.',
+  'Wahdania, S.Pd.': 'Wahdania, S.Pd., Gr.',
+  'La Ode Hermawan Rauf, S.Pd.': 'La Ode Hermawan Rauf, S.Pd., Gr.',
 };
 
 function remapTeacher(teacher: string | null): string | null {
